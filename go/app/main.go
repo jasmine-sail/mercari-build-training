@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"encoding/json"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -28,9 +29,40 @@ func root(c echo.Context) error {
 func addItem(c echo.Context) error {
 	// Get form data
 	name := c.FormValue("name")
-	c.Logger().Infof("Receive item: %s", name)
+	category := c.FormValue("category")
+	c.Logger().Infof("Receive item: %s, Category: %s", name, category)
 
-	message := fmt.Sprintf("item received: %s", name)
+	file,err := os.ReadFile("items.json")
+	if err != nil && !os.IsNotExist(err){
+		return err
+	}
+
+	var items []map[string]string
+	if err ==nil {
+		if err := json.Unmarshal(file,&items); err != nil{
+			return err
+		}	
+	}
+	
+	newItem := map[string]string{
+		"name": name,
+		"category": category,
+	}
+
+	items = append(items,newItem)
+
+	newItemsJSON, err := json.Marshal(map[string][]map[string]string{"items": items})
+	if err != nil {
+		return err
+	}
+
+	if err := os.WriteFile("items.json", newItemsJSON,0644); err != nil {
+		return err
+	}
+
+
+
+	message := fmt.Sprintf("item received: %s, Category: %s", name, category)
 	res := Response{Message: message}
 
 	return c.JSON(http.StatusOK, res)

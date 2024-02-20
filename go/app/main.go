@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"eccoding/hex"
 	"fmt"
 	"net/http"
 	"os"
@@ -21,6 +23,12 @@ type Response struct {
 	Message string `json:"message"`
 }
 
+//Iten構造体　JSONオブジェクト内のキーが name になる
+type Item struct{
+	Name string `json:"name"`
+	Category string `json:"category"`
+	Image string `json:"image"`
+}
 func root(c echo.Context) error {
 	res := Response{Message: "Hello, world!"}
 	return c.JSON(http.StatusOK, res)
@@ -30,28 +38,52 @@ func addItem(c echo.Context) error {
 	// Get form data
 	name := c.FormValue("name")
 	category := c.FormValue("category")
+	imageFile,err := c.FormFile("image")
+
+	item := Item{name,category}
+	byte,err := json.Marshal(item)
+	if err != nil{
+		return err
+	}
+	jsonBytes := []byte()(`{"name":name,"category":category}`)
+	var item Item
+	if err := json.Unmarshal(jsonBytes,&item); err := nil {
+		return err
+	}
+		if err != nil {
+			return err
+		}
 	c.Logger().Infof("Receive item: %s, Category: %s", name, category)
+	
+
 
 	file,err := os.ReadFile("items.json")
 	if err != nil && !os.IsNotExist(err){
 		return err
 	}
+	defer file.Close()
 
-	var items []map[string]string
-	if err ==nil {
-		if err := json.Unmarshal(file,&items); err != nil{
-			return err
-		}	
+	 encoder := json.NewEncoder(file)
+	 if err := encoder.Encode(item);err != nil {
+		return err
+	 }
+
+	
+	//画像の保存
+	imagePath, err := saveImage(imageFile)
+	if err != nil{
+		return err
 	}
 	
-	newItem := map[string]string{
-		"name": name,
-		"category": category,
+	item := Item{
+		Name: name,
+		Category: category,
+		Image: imagePath,
 	}
 
-	items = append(items,newItem)
+	items = append(items,Item)
 
-	newItemsJSON, err := json.Marshal(map[string][]map[string]string{"items": items})
+	newItemsJSON, err := json.Marshal(map[string][]item{"items": items})
 	if err != nil {
 		return err
 	}
@@ -62,7 +94,7 @@ func addItem(c echo.Context) error {
 
 
 
-	message := fmt.Sprintf("item received: %s, Category: %s", name, category)
+	message := fmt.Sprintf("item received: %s, Category: %s, Image: %s", name, category,imagePath)
 	res := Response{Message: message}
 
 	return c.JSON(http.StatusOK, res)
@@ -102,7 +134,7 @@ func main() {
 
 	// Routes
 	e.GET("/", root)
-	e.POST("/items", addItem)
+	e.POST("/items", addItem)  //ブラウザはGETでリクエストしているのにPOSTなので返ってこない
 	e.GET("/image/:imageFilename", getImg)
 
 

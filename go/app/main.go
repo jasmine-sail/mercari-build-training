@@ -1,14 +1,12 @@
 package main
 
 import (
-	"crypto/sha256"
-	"eccoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"path"
 	"strings"
-	"encoding/json"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -23,81 +21,62 @@ type Response struct {
 	Message string `json:"message"`
 }
 
-//Iten構造体　JSONオブジェクト内のキーが name になる
-type Item struct{
-	Name string `json:"name"`
+// 構造体
+type Item struct {
+	Name     string `json:"name"`
 	Category string `json:"category"`
-	Image string `json:"image"`
 }
+
+type ItemList struct {
+	Items []Item `json:"items"`
+}
+
+// e.GET("/", root)
 func root(c echo.Context) error {
 	res := Response{Message: "Hello, world!"}
 	return c.JSON(http.StatusOK, res)
 }
 
+// e.POST("/items", addItem) これでjsonファイルに追加！
 func addItem(c echo.Context) error {
-	// Get form data
-	name := c.FormValue("name")
-	category := c.FormValue("category")
-	imageFile,err := c.FormFile("image")
-
-	item := Item{name,category}
-	byte,err := json.Marshal(item)
-	if err != nil{
-		return err
-	}
-	jsonBytes := []byte()(`{"name":name,"category":category}`)
-	var item Item
-	if err := json.Unmarshal(jsonBytes,&item); err := nil {
-		return err
-	}
-		if err != nil {
-			return err
-		}
-	c.Logger().Infof("Receive item: %s, Category: %s", name, category)
-	
-
-
-	file,err := os.ReadFile("items.json")
-	if err != nil && !os.IsNotExist(err){
-		return err
+	file, err := os.OpenFile("items.json", os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
 	defer file.Close()
+	// Get form data
+	var itemlist ItemList
+	var item Item
+	item.Name = c.FormValue("name")
+	item.Category = c.FormValue("category")
+	c.Logger().Infof("Receive item: %s, %s", item.Name, item.Category)
 
-	 encoder := json.NewEncoder(file)
-	 if err := encoder.Encode(item);err != nil {
-		return err
-	 }
-
-	
-	//画像の保存
-	imagePath, err := saveImage(imageFile)
-	if err != nil{
-		return err
-	}
-	
-	item := Item{
-		Name: name,
-		Category: category,
-		Image: imagePath,
+	itemlist.Items = append(itemlist.Items, item)
+	encoder := json.NewEncoder(file)
+	if err := encoder.Encode(itemlist); err != nil {
+		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
 
-	items = append(items,Item)
-
-	newItemsJSON, err := json.Marshal(map[string][]item{"items": items})
-	if err != nil {
-		return err
-	}
-
-	if err := os.WriteFile("items.json", newItemsJSON,0644); err != nil {
-		return err
-	}
-
-
-
-	message := fmt.Sprintf("item received: %s, Category: %s, Image: %s", name, category,imagePath)
+	message := fmt.Sprintf("item received: %s,%s", item.Name, item.Category)
 	res := Response{Message: message}
 
 	return c.JSON(http.StatusOK, res)
+}
+
+// e.GET("/items",getItem)jsonファイルからデータを持ってくる！
+func getItem(c echo.Context) error {
+	file, err := os.Open("items.json")
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
+	}
+	defer file.Close()
+	var getitem ItemList
+	if err := json.NewDecoder(file).Decode(&getitem); err != nil {
+		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
+	}
+	defer file.Close()
+
+	return c.JSON(http.StatusOK, getitem)
 }
 
 func getImg(c echo.Context) error {
@@ -123,20 +102,20 @@ func main() {
 	e.Use(middleware.Recover())
 	e.Logger.SetLevel(log.INFO)
 
-	frontURL := os.Getenv("FRONT_URL")
-	if frontURL == "" {
-		frontURL = "http://localhost:3000"
+	front_url := os.Getenv("FRONT_URL")
+	if front_url == "" {
+		front_url = "http://localhost:3000"
 	}
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{frontURL},
+		AllowOrigins: []string{front_url},
 		AllowMethods: []string{http.MethodGet, http.MethodPut, http.MethodPost, http.MethodDelete},
 	}))
 
 	// Routes
 	e.GET("/", root)
-	e.POST("/items", addItem)  //ブラウザはGETでリクエストしているのにPOSTなので返ってこない
+	e.POST("/items", addItem)
+	e.GET("/items", getItem)
 	e.GET("/image/:imageFilename", getImg)
-
 
 	// Start server
 	e.Logger.Fatal(e.Start(":9000"))

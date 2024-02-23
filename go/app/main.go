@@ -39,11 +39,6 @@ func root(c echo.Context) error {
 
 // e.POST("/items", addItem) これでjsonファイルに追加！
 func addItem(c echo.Context) error {
-	file, err := os.OpenFile("items.json", os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
-	}
-	defer file.Close()
 	// Get form data
 	var itemlist ItemList
 	var item Item
@@ -51,7 +46,30 @@ func addItem(c echo.Context) error {
 	item.Category = c.FormValue("category")
 	c.Logger().Infof("Receive item: %s, %s", item.Name, item.Category)
 
+	//4.jsonファイルの読み込み
+	file, err := os.OpenFile("items.json", os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
+	}
+	defer file.Close()
+
+	//5.jsonファイルをdecode jsonのNewDecoderとDecode関数を使う
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&itemlist); err != nil {
+		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
+	}
+
+	// 6. step5でdecodeしたitemをstep3のitemに追加する
 	itemlist.Items = append(itemlist.Items, item)
+
+	// 7. jsonの書き込み用にファイルを開く
+	//fileに再代入なので:=ではなく=で書く
+	file, err = os.Create("items.json")
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
+	}
+	defer file.Close()
+	//8. jsonファイルに書き込み
 	encoder := json.NewEncoder(file)
 	if err := encoder.Encode(itemlist); err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
@@ -81,8 +99,12 @@ func getItem(c echo.Context) error {
 
 func getImg(c echo.Context) error {
 	// Create image path
+	//画像ファイルが保存されているディレクトリのパスImgDirとクライアントから送信された画像ファイルの名前
+	//これを結合して画像ファイルのパスを生成
+	// ImgDir = /images,e.GET("/image/:imageFilename", getImg)より
+	//imgPathは　/images/:imageFilenameになる
 	imgPath := path.Join(ImgDir, c.Param("imageFilename"))
-
+	//拡張子がjpgかの確認
 	if !strings.HasSuffix(imgPath, ".jpg") {
 		res := Response{Message: "Image path does not end with .jpg"}
 		return c.JSON(http.StatusBadRequest, res)
@@ -91,6 +113,8 @@ func getImg(c echo.Context) error {
 		c.Logger().Debugf("Image not found: %s", imgPath)
 		imgPath = path.Join(ImgDir, "default.jpg")
 	}
+	//c.File()関数は、指定されたファイルパスに対応するファイルを
+	//クライアントに送信するためのレスポンスを作成
 	return c.File(imgPath)
 }
 

@@ -30,7 +30,7 @@ type Response struct {
 type Item struct {
 	Name     string `json:"name"`
 	Category string `json:"category"`
-	Image    string `json:"image"`
+	Image    string `json:"image_name"`
 }
 
 type ItemList struct {
@@ -47,10 +47,10 @@ func root(c echo.Context) error {
 func addItem(c echo.Context) error {
 	// Get form data
 	var itemlist ItemList
-	var item Item
-	item.Name = c.FormValue("name")
-	item.Category = c.FormValue("category")
-	imageFile, err := c.FormFile("image")
+
+	name := c.FormValue("name")
+	category := c.FormValue("category")
+	imageFile, err := c.FormFile("image") //FormFileメソッドはファイルとエラーの二つの値を返す
 
 	//4.jsonファイルの読み込み
 	file, err := os.OpenFile("items.json", os.O_RDWR|os.O_CREATE, 0644)
@@ -71,31 +71,29 @@ func addItem(c echo.Context) error {
 	if _, err := io.Copy(hash, src); err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
+	//hash値の取得
 	hashString := hex.EncodeToString(hash.Sum(nil))
+	//hash化されたファイル名
 	imageFilename := hashString + ".jpg"
-
+	//ポストされた画像のファイルを <hash>.jpg(=imageFilename)という名前で保存
 	savePath := filepath.Join(ImgDir, imageFilename)
+	// /images/<hash>.jpgに新しいファイルを作る（ハッシュ化された画像の保存先）
 	dst, err := os.Create(savePath)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
 	defer dst.Close()
-
+	//src(読み込んだ画像ファイル)をdst(画像の保存先)に保存
 	if _, err := io.Copy(dst, src); err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
-	file, err = os.OpenFile("items.json", os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
-	}
-	defer file.Close()
 
 	//5.jsonファイルをdecode jsonのNewDecoderとDecode関数を使う
 	decoder := json.NewDecoder(file)
 	if err := decoder.Decode(&itemlist); err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
-	item = Item{Name: item.Name, Category: item.Category, Image: imageFilename}
+	item := Item{Name: name, Category: category, Image: imageFilename}
 
 	// 6. step5でdecodeしたitemをstep3のitemに追加する
 	itemlist.Items = append(itemlist.Items, item)
@@ -112,7 +110,7 @@ func addItem(c echo.Context) error {
 	if err := encoder.Encode(itemlist); err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
-	c.Logger().Infof("Receive item: %s, %s,%s", item.Name, item.Category, item.Image)
+	c.Logger().Infof("Receive item: %s, %s, %s", item.Name, item.Category, item.Image)
 	message := fmt.Sprintf("item received: %s,%s,%s", item.Name, item.Category, item.Image)
 	res := Response{Message: message}
 
@@ -157,16 +155,19 @@ func getImg(c echo.Context) error {
 	return c.File(imgPath)
 }
 
-// e.GET("/image/:id",getID )
+// e.GET("/items/:id",getId )
 func getId(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
+	}
 	file, err := os.Open("items.json")
 	if err != nil {
 		c.Logger().Infof("Error message: %s", err)
 	}
 	defer file.Close()
 
-	iditem := ItemList{}
+	var iditem ItemList
 
 	if err := json.NewDecoder(file).Decode(&iditem); err != nil {
 		c.Logger().Infof("Error message: %s", err)
@@ -182,7 +183,7 @@ func main() {
 	// Middleware
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
-	e.Logger.SetLevel(log.INFO)
+	e.Logger.SetLevel(log.DEBUG)
 
 	front_url := os.Getenv("FRONT_URL")
 	if front_url == "" {
@@ -198,7 +199,7 @@ func main() {
 	e.POST("/items", addItem)
 	e.GET("/items", getItem)
 	e.GET("/image/:imageFilename", getImg)
-	e.GET("/image/:id", getId)
+	e.GET("/items/:id", getId)
 
 	// Start server
 	e.Logger.Fatal(e.Start(":9000"))

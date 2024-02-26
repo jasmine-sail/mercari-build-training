@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -16,10 +17,12 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 const (
-	ImgDir = "images"
+	ImgDir  = "images"
+	DB_PATH = "../db/mercari.sqlite3"
 )
 
 type Response struct {
@@ -30,7 +33,7 @@ type Response struct {
 type Item struct {
 	Name     string `json:"name"`
 	Category string `json:"category"`
-	Image    string `json:"image"`
+	Image    string `json:"image_name"`
 }
 
 type ItemList struct {
@@ -46,18 +49,11 @@ func root(c echo.Context) error {
 // e.POST("/items", addItem) これでjsonファイルに追加！
 func addItem(c echo.Context) error {
 	// Get form data
-	var itemlist ItemList
+	itemlist := ItemList{}
 	var item Item
 	item.Name = c.FormValue("name")
 	item.Category = c.FormValue("category")
 	imageFile, err := c.FormFile("image")
-
-	//4.jsonファイルの読み込み
-	file, err := os.OpenFile("items.json", os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
-	}
-	defer file.Close()
 
 	//画像ファイルの読み込み
 	src, err := imageFile.Open()
@@ -84,34 +80,24 @@ func addItem(c echo.Context) error {
 	if _, err := io.Copy(dst, src); err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
-	file, err = os.OpenFile("items.json", os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
-	}
-	defer file.Close()
 
-	//5.jsonファイルをdecode jsonのNewDecoderとDecode関数を使う
-	decoder := json.NewDecoder(file)
-	if err := decoder.Decode(&itemlist); err != nil {
-		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
-	}
 	item = Item{Name: item.Name, Category: item.Category, Image: imageFilename}
 
 	// 6. step5でdecodeしたitemをstep3のitemに追加する
 	itemlist.Items = append(itemlist.Items, item)
 
-	// 7. jsonの書き込み用にファイルを開く
-	//fileに再代入なので:=ではなく=で書く
-	file, err = os.Create("items.json")
+	//データベースへの接続
+	db, err := sql.Open("sqlite3", DB_PATH)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
-	defer file.Close()
-	//8. jsonファイルに書き込み
-	encoder := json.NewEncoder(file)
-	if err := encoder.Encode(itemlist); err != nil {
+	defer db.Close()
+	//商品の追加
+	_, err = db.Exec("INSERT INTO items (name, category, image_name) VALUES (?, ?, ?)", item.Name, item.Category, item.Image)
+	if err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
+	//log
 	c.Logger().Infof("Receive item: %s, %s,%s", item.Name, item.Category, item.Image)
 	message := fmt.Sprintf("item received: %s,%s,%s", item.Name, item.Category, item.Image)
 	res := Response{Message: message}
@@ -121,17 +107,29 @@ func addItem(c echo.Context) error {
 
 // e.GET("/items",getItem)jsonファイルからデータを持ってくる！
 func getItem(c echo.Context) error {
-	file, err := os.Open("items.json")
+	var item Item
+	//データベースへの接続
+	db, err := sql.Open("sqlite3", DB_PATH)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
-	defer file.Close()
-	var getitem ItemList
-	if err := json.NewDecoder(file).Decode(&getitem); err != nil {
+	defer db.Close()
+	//データベースから商品の取得
+	rows, err := db.Query("SELECT name,category,image_name FROM items ")
+	if err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
-	defer file.Close()
+	defer rows.Close()
 
+	var getitem ItemList
+	for rows.Next() {
+		var name, category, image string
+		if err := rows.Scan(&item.Name, &item.Category, &item.Image); err != nil {
+			return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
+		}
+		item = Item{Name: name, Category: category, Image: image}
+		getitem.Items = append(getitem.Items, item)
+	}
 	return c.JSON(http.StatusOK, getitem)
 }
 
@@ -176,6 +174,16 @@ func getId(c echo.Context) error {
 
 }
 
+// e.GET("/search", getItemFomSearching)
+//func getItemFomSearching(c echo.Context) error {
+//データベースへの接続
+//	db, err := sql.Open("sqlite3", DB_PATH)
+//	if err != nil {
+//		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
+//	}
+//	defer db.Close()
+//}
+
 func main() {
 	e := echo.New()
 
@@ -199,7 +207,7 @@ func main() {
 	e.GET("/items", getItem)
 	e.GET("/image/:imageFilename", getImg)
 	e.GET("/image/:id", getId)
-
+	//e.GET("/search", getItemFomSearching)
 	// Start server
 	e.Logger.Fatal(e.Start(":9000"))
 }

@@ -49,11 +49,11 @@ func root(c echo.Context) error {
 // e.POST("/items", addItem) これでjsonファイルに追加！
 func addItem(c echo.Context) error {
 	// Get form data
-	itemlist := ItemList{}
+	//var itemlist ItemList
 	var item Item
-	item.Name = c.FormValue("name")
-	item.Category = c.FormValue("category")
-	imageFile, err := c.FormFile("image")
+	item.Name = c.FormValue("name")         //jacket
+	item.Category = c.FormValue("category") //fashion
+	imageFile, err := c.FormFile("image")   //imageファイル
 
 	//画像ファイルの読み込み
 	src, err := imageFile.Open()
@@ -81,10 +81,10 @@ func addItem(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
 
-	item = Item{Name: item.Name, Category: item.Category, Image: imageFilename}
+	//item = Item{Name: item.Name, Category: item.Category, Image: imageFilename}
 
 	// 6. step5でdecodeしたitemをstep3のitemに追加する
-	itemlist.Items = append(itemlist.Items, item)
+	//itemlist.Items = append(itemlist.Items, item)
 
 	//データベースへの接続
 	db, err := sql.Open("sqlite3", DB_PATH)
@@ -93,13 +93,16 @@ func addItem(c echo.Context) error {
 	}
 	defer db.Close()
 	//商品の追加
-	_, err = db.Exec("INSERT INTO items (name, category, image_name) VALUES (?, ?, ?)", item.Name, item.Category, item.Image)
+	_, err = db.Exec("INSERT INTO items (name, category, image_name) VALUES (?,?,?)", item.Name, item.Category, imageFilename)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
 	//log
-	c.Logger().Infof("Receive item: %s, %s,%s", item.Name, item.Category, item.Image)
-	message := fmt.Sprintf("item received: %s,%s,%s", item.Name, item.Category, item.Image)
+	//c.Logger().Infof("Receive item: %s, %s,%s", item.Name, item.Category, item.Image)
+	//message := fmt.Sprintf("item received: %s,%s,%s", item.Name, item.Category, item.Image)
+	c.Logger().Infof("Receive item: %s, %s,%s", item.Name, item.Category, imageFilename)
+	message := fmt.Sprintf("item received: %s,%s,%s", item.Name, item.Category, imageFilename)
+
 	res := Response{Message: message}
 
 	return c.JSON(http.StatusOK, res)
@@ -107,7 +110,7 @@ func addItem(c echo.Context) error {
 
 // e.GET("/items",getItem)jsonファイルからデータを持ってくる！
 func getItem(c echo.Context) error {
-	var item Item
+	//var item Item
 	//データベースへの接続
 	db, err := sql.Open("sqlite3", DB_PATH)
 	if err != nil {
@@ -124,11 +127,11 @@ func getItem(c echo.Context) error {
 	var getitem ItemList
 	for rows.Next() {
 		var name, category, image string
-		if err := rows.Scan(&item.Name, &item.Category, &item.Image); err != nil {
+		if err := rows.Scan(&name, &category, &image); err != nil {
 			return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 		}
-		item = Item{Name: name, Category: category, Image: image}
-		getitem.Items = append(getitem.Items, item)
+		items := Item{Name: name, Category: category, Image: image}
+		getitem.Items = append(getitem.Items, items)
 	}
 	return c.JSON(http.StatusOK, getitem)
 }

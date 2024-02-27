@@ -178,14 +178,37 @@ func getId(c echo.Context) error {
 }
 
 // e.GET("/search", getItemFomSearching)
-//func getItemFomSearching(c echo.Context) error {
-//データベースへの接続
-//	db, err := sql.Open("sqlite3", DB_PATH)
-//	if err != nil {
-//		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
-//	}
-//	defer db.Close()
-//}
+func getItemFomSearching(c echo.Context) error {
+	//クエリパラメーターの値の取得
+	keyword := c.QueryParam("keyword")
+	//データベースへの接続
+	db, err := sql.Open("sqlite3", DB_PATH)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
+	}
+	defer db.Close()
+	//データベースから商品の検索
+	//neme列にキーワードを含むものを探している
+	//%は0文字以上の任意の文字列　?に"%"+keyword+"%"が入る
+	rows, err := db.Query("SELECT name, category, image_name FROM items WHERE name LIKE ?", "%"+keyword+"%")
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
+	}
+	defer rows.Close()
+
+	var searchResult ItemList
+	for rows.Next() {
+		var name, category, image string
+		if err := rows.Scan(&name, &category, &image); err != nil {
+			return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
+		}
+		item := Item{Name: name, Category: category, Image: image}
+		searchResult.Items = append(searchResult.Items, item)
+	}
+
+	return c.JSON(http.StatusOK, searchResult)
+
+}
 
 func main() {
 	e := echo.New()
@@ -210,7 +233,7 @@ func main() {
 	e.GET("/items", getItem)
 	e.GET("/image/:imageFilename", getImg)
 	e.GET("/image/:id", getId)
-	//e.GET("/search", getItemFomSearching)
+	e.GET("/search", getItemFomSearching)
 	// Start server
 	e.Logger.Fatal(e.Start(":9000"))
 }

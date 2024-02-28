@@ -48,19 +48,8 @@ func root(c echo.Context) error {
 // e.POST("/items", addItem) これでjsonファイルに追加！
 func addItem(c echo.Context) error {
 	// Get form data
-<<<<<<< HEAD
-	var itemlist ItemList
 
-	name := c.FormValue("name")
-	category := c.FormValue("category")
-	imageFile, err := c.FormFile("image") //FormFileメソッドはファイルとエラーの二つの値を返す
-
-	//4.jsonファイルの読み込み
-	file, err := os.OpenFile("items.json", os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
-	}
-	defer file.Close()
+	
 =======
 	//var itemlist ItemList
 	var item Item
@@ -98,13 +87,8 @@ func addItem(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
 
-<<<<<<< HEAD
-	//5.jsonファイルをdecode jsonのNewDecoderとDecode関数を使う
-	decoder := json.NewDecoder(file)
-	if err := decoder.Decode(&itemlist); err != nil {
-		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
-	}
-	item := Item{Name: name, Category: category, Image: imageFilename}
+
+	
 =======
 	//item = Item{Name: item.Name, Category: item.Category, Image: imageFilename}
 >>>>>>> step4
@@ -143,9 +127,7 @@ func addItem(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
 <<<<<<< HEAD
-	c.Logger().Infof("Receive item: %s, %s, %s", item.Name, item.Category, item.Image)
-	message := fmt.Sprintf("item received: %s,%s,%s", item.Name, item.Category, item.Image)
-=======
+	
 	//log
 	//c.Logger().Infof("Receive item: %s, %s,%s", item.Name, item.Category, item.Image)
 	//message := fmt.Sprintf("item received: %s,%s,%s", item.Name, item.Category, item.Image)
@@ -211,11 +193,9 @@ func getImg(c echo.Context) error {
 // e.GET("/items/:id",getId )
 func getId(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
-<<<<<<< HEAD
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
-	}
-	file, err := os.Open("items.json")
+
+	
+	
 =======
 
 	//データベースへの接続
@@ -224,10 +204,10 @@ func getId(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
-<<<<<<< HEAD
-	defer file.Close()
 
-	var iditem ItemList
+	
+
+	
 =======
 	defer db.Close()
 >>>>>>> step4
@@ -306,11 +286,11 @@ func main() {
 	e.POST("/items", addItem)
 	e.GET("/items", getItem)
 	e.GET("/image/:imageFilename", getImg)
-<<<<<<< HEAD
-	e.GET("/items/:id", getId)
+
+	
 
 =======
-	e.GET("/image/:id", getId)
+	e.GET("/items/:id", getId)
 	e.GET("/search", getItemFomSearching)
 >>>>>>> step4
 	// Start server

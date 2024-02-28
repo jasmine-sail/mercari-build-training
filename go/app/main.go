@@ -93,9 +93,9 @@ func addItem(c echo.Context) error {
 	defer db.Close()
 
 	//商品の追加
-	var category_id int
+	var categoryid int
 	row := db.QueryRow("SELECT id FROM categories WHERE name = $1", item.Category)
-	err = row.Scan(&category_id)
+	err = row.Scan(&categoryid)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			_, err = db.Exec("INSERT INTO categories (name) VALUES ($1)", item.Category)
@@ -103,7 +103,7 @@ func addItem(c echo.Context) error {
 				return err
 			}
 			row := db.QueryRow("SELECT id FROM categories WHERE name = $1", item.Category)
-			err = row.Scan(&category_id)
+			err = row.Scan(&categoryid)
 			if err != nil {
 				return err
 			}
@@ -111,7 +111,7 @@ func addItem(c echo.Context) error {
 			return err
 		}
 	}
-	_, err = db.Exec("INSERT INTO items (name, category, image_name) VALUES ($1, $2, $3)", item.Name, category_id, imageFilename)
+	_, err = db.Exec("INSERT INTO items (name, category_id, image_name) VALUES ($1, $2, $3)", item.Name, categoryid, imageFilename)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}

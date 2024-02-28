@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -92,8 +91,27 @@ func addItem(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
 	defer db.Close()
+
 	//商品の追加
-	_, err = db.Exec("INSERT INTO items (name, category, image_name) VALUES (?,?,?)", item.Name, item.Category, imageFilename)
+	var category_id int
+	row := db.QueryRow("SELECT id FROM categories WHERE name = $1", item.Category)
+	err = row.Scan(&category_id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			_, err = db.Exec("INSERT INTO categories (name) VALUES ($1)", item.Category)
+			if err != nil {
+				return err
+			}
+			row := db.QueryRow("SELECT id FROM categories WHERE name = $1", item.Category)
+			err = row.Scan(&category_id)
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	_, err = db.Exec("INSERT INTO items (name, category, image_name) VALUES ($1, $2, $3)", item.Name, category_id, imageFilename)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
@@ -118,7 +136,7 @@ func getItem(c echo.Context) error {
 	}
 	defer db.Close()
 	//データベースから商品の取得
-	rows, err := db.Query("SELECT name,category,image_name FROM items ")
+	rows, err := db.Query("SELECT items.name, categories.name, items.image_name FROM items JOIN categories ON items.category_id = categories.id")
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
@@ -161,18 +179,29 @@ func getImg(c echo.Context) error {
 // e.GET("/image/:id",getID )
 func getId(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
-	file, err := os.Open("items.json")
+
+	//データベースへの接続
+	db, err := sql.Open("sqlite3", DB_PATH)
 	if err != nil {
-		c.Logger().Infof("Error message: %s", err)
+		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
-	defer file.Close()
+	defer db.Close()
 
-	iditem := ItemList{}
-
-	if err := json.NewDecoder(file).Decode(&iditem); err != nil {
-		c.Logger().Infof("Error message: %s", err)
+	rows, err := db.Query("SELECT items.name, categories.name, items.image_name FROM items JOIN categories ON items.category_id = categories.id WHERE items.id LIKE ?", id)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
-	defer file.Close()
+	defer rows.Close()
+	var iditem ItemList
+	for rows.Next() {
+		var name, category, image string
+		if err := rows.Scan(&name, &category, &image); err != nil {
+			return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
+		}
+		items := Item{Name: name, Category: category, Image: image}
+		iditem.Items = append(iditem.Items, items)
+	}
+
 	return c.JSON(http.StatusOK, iditem.Items[id-1])
 
 }
@@ -190,7 +219,7 @@ func getItemFomSearching(c echo.Context) error {
 	//データベースから商品の検索
 	//neme列にキーワードを含むものを探している
 	//%は0文字以上の任意の文字列　?に"%"+keyword+"%"が入る
-	rows, err := db.Query("SELECT name, category, image_name FROM items WHERE name LIKE ?", "%"+keyword+"%")
+	rows, err := db.Query("SELECT items.name, categories.name, items.image_name FROM items JOIN categories ON items.category_id = categories.id WHERE items.name LIKE ?", "%"+keyword+"%")
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}

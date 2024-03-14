@@ -100,15 +100,15 @@ func addItem(c echo.Context) error {
 		if err == sql.ErrNoRows {
 			_, err = db.Exec("INSERT INTO categories (name) VALUES ($1)", item.Category)
 			if err != nil {
-				return err
+				return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 			}
 			row := db.QueryRow("SELECT id FROM categories WHERE name = $1", item.Category)
 			err = row.Scan(&categoryid)
 			if err != nil {
-				return err
+				return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 			}
 		} else {
-			return err
+			return c.JSON(http.StatusInternalServerError, Response{Message: "failed to insert category" + err.Error()}) //ここ
 		}
 	}
 	_, err = db.Exec("INSERT INTO items (name, category_id, image_name) VALUES ($1, $2, $3)", item.Name, categoryid, imageFilename)

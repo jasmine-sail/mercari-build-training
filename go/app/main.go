@@ -49,14 +49,11 @@ func root(c echo.Context) error {
 func addItem(c echo.Context) error {
 	// Get form data
 
-	
-=======
 	//var itemlist ItemList
 	var item Item
 	item.Name = c.FormValue("name")         //jacket
 	item.Category = c.FormValue("category") //fashion
 	imageFile, err := c.FormFile("image")   //imageファイル
->>>>>>> step4
 
 	//画像ファイルの読み込み
 	src, err := imageFile.Open()
@@ -87,11 +84,7 @@ func addItem(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
 
-
-	
-=======
 	//item = Item{Name: item.Name, Category: item.Category, Image: imageFilename}
->>>>>>> step4
 
 	// 6. step5でdecodeしたitemをstep3のitemに追加する
 	//itemlist.Items = append(itemlist.Items, item)
@@ -126,15 +119,13 @@ func addItem(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
-<<<<<<< HEAD
-	
+
 	//log
 	//c.Logger().Infof("Receive item: %s, %s,%s", item.Name, item.Category, item.Image)
 	//message := fmt.Sprintf("item received: %s,%s,%s", item.Name, item.Category, item.Image)
 	c.Logger().Infof("Receive item: %s, %s,%s", item.Name, item.Category, imageFilename)
 	message := fmt.Sprintf("item received: %s,%s,%s", item.Name, item.Category, imageFilename)
 
->>>>>>> step4
 	res := Response{Message: message}
 
 	return c.JSON(http.StatusOK, res)
@@ -194,23 +185,14 @@ func getImg(c echo.Context) error {
 func getId(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 
-	
-	
-=======
-
 	//データベースへの接続
 	db, err := sql.Open("sqlite3", DB_PATH)
->>>>>>> step4
+
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
 
-	
-
-	
-=======
 	defer db.Close()
->>>>>>> step4
 
 	rows, err := db.Query("SELECT items.name, categories.name, items.image_name FROM items JOIN categories ON items.category_id = categories.id WHERE items.id LIKE ?", id)
 	if err != nil {
@@ -287,12 +269,9 @@ func main() {
 	e.GET("/items", getItem)
 	e.GET("/image/:imageFilename", getImg)
 
-	
-
-=======
 	e.GET("/items/:id", getId)
 	e.GET("/search", getItemFomSearching)
->>>>>>> step4
+
 	// Start server
 	e.Logger.Fatal(e.Start(":9000"))
 }

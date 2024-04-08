@@ -275,7 +275,9 @@ func main() {
 	e.GET("/items", getItem)
 	e.GET("/image/:imageFilename", getImg)
 
-	e.GET("/image/:id", getId)
+
+	e.GET("/items/:id", getId)
+
 	e.GET("/search", getItemFomSearching)
 
 	// Start server

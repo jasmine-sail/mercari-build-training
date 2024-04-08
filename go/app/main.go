@@ -55,6 +55,7 @@ func addItem(c echo.Context) error {
 	item.Category = c.FormValue("category") //fashion
 	imageFile, err := c.FormFile("image")   //imageファイル
 
+
 	//画像ファイルの読み込み
 	src, err := imageFile.Open()
 	if err != nil {
@@ -84,7 +85,9 @@ func addItem(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 	}
 
+
 	//item = Item{Name: item.Name, Category: item.Category, Image: imageFilename}
+
 
 	// 6. step5でdecodeしたitemをstep3のitemに追加する
 	//itemlist.Items = append(itemlist.Items, item)
@@ -104,15 +107,15 @@ func addItem(c echo.Context) error {
 		if err == sql.ErrNoRows {
 			_, err = db.Exec("INSERT INTO categories (name) VALUES ($1)", item.Category)
 			if err != nil {
-				return err
+				return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 			}
 			row := db.QueryRow("SELECT id FROM categories WHERE name = $1", item.Category)
 			err = row.Scan(&categoryid)
 			if err != nil {
-				return err
+				return c.JSON(http.StatusInternalServerError, Response{Message: err.Error()})
 			}
 		} else {
-			return err
+			return c.JSON(http.StatusInternalServerError, Response{Message: "failed to insert category" + err.Error()}) //ここ
 		}
 	}
 	_, err = db.Exec("INSERT INTO items (name, category_id, image_name) VALUES ($1, $2, $3)", item.Name, categoryid, imageFilename)
@@ -125,6 +128,7 @@ func addItem(c echo.Context) error {
 	//message := fmt.Sprintf("item received: %s,%s,%s", item.Name, item.Category, item.Image)
 	c.Logger().Infof("Receive item: %s, %s,%s", item.Name, item.Category, imageFilename)
 	message := fmt.Sprintf("item received: %s,%s,%s", item.Name, item.Category, imageFilename)
+
 
 	res := Response{Message: message}
 
@@ -185,6 +189,7 @@ func getImg(c echo.Context) error {
 func getId(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 
+
 	//データベースへの接続
 	db, err := sql.Open("sqlite3", DB_PATH)
 
@@ -193,6 +198,7 @@ func getId(c echo.Context) error {
 	}
 
 	defer db.Close()
+
 
 	rows, err := db.Query("SELECT items.name, categories.name, items.image_name FROM items JOIN categories ON items.category_id = categories.id WHERE items.id LIKE ?", id)
 	if err != nil {
@@ -269,7 +275,9 @@ func main() {
 	e.GET("/items", getItem)
 	e.GET("/image/:imageFilename", getImg)
 
+
 	e.GET("/items/:id", getId)
+
 	e.GET("/search", getItemFomSearching)
 
 	// Start server

@@ -1,24 +1,21 @@
 FROM golang:1.22-alpine
 
-RUN apk add --no-cache gcc musl-dev 
-
 WORKDIR /app
 
+RUN apk add --no-cache gcc musl-dev 
+
+COPY . .
+
 RUN addgroup -S mercari && adduser -S trainee -G mercari
+RUN chown -R trainee:mercari /app
 # RUN chown -R trainee:mercari /path/to/db
 
-COPY go/go.mod /app
-COPY go/go.sum /app
-COPY go/images/ /app/images
 
 RUN go mod tidy
 
-RUN chown -R trainee:mercari /app
-
-RUN go build -o myapp .
 
 EXPOSE 9000
 
 USER trainee
 
-CMD ["./myapp"]
+CMD ["go","run","app/main.go"]
